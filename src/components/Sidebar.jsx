@@ -67,7 +67,11 @@ export default function Sidebar({ isOpen }) {
           text="Logout"
           isOpen={isOpen}
           active={false}
-          onClick={() => navigate("/")}
+          onClick={() => {
+            if (window.confirm("Apakah Anda yakin ingin logout?")) {
+              navigate("/");
+            }
+          }}
         />
       </div>
     </aside>

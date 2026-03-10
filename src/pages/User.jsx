@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { Plus, Edit, Trash } from "lucide-react";
@@ -6,18 +6,33 @@ import { Plus, Edit, Trash } from "lucide-react";
 export default function User() {
   const [isOpen, setIsOpen] = useState(true);
 
-  const data = [
-    {
-      id: 1,
-      name: "Nama 1",
-      email: "Email 1",
-    },
-    {
-      id: 2,
-      name: "Nama 2",
-      email: "Email 2",
-    },
-  ];
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fungsi untuk mengambil data dari backend
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("http://localhost:5000/api/users");
+      if (!response.ok) {
+        throw new Error("Gagal mengambil data dari server");
+      }
+      const jsonData = await response.json();
+      setData(jsonData);
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching users:", err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Panggil fetchUsers saat komponen pertama kali dimuat
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -75,38 +90,54 @@ export default function User() {
                       <th className="p-3 text-center">Aksi</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {data.map((item, index) => (
-                      <tr
-                        key={item.id}
-                        className="bg-rose-300 even:bg-rose-200"
-                      >
-                        <td className="p-3">{index + 1}.</td>
+                      <tbody>
+                        {loading && (
+                          <tr>
+                            <td colSpan="5" className="p-4 text-center">Loading data...</td>
+                          </tr>
+                        )}
+                        {error && (
+                          <tr>
+                            <td colSpan="5" className="p-4 text-center text-red-500">Error: {error}</td>
+                          </tr>
+                        )}
+                        {!loading && !error && data.length === 0 && (
+                          <tr>
+                            <td colSpan="5" className="p-4 text-center">Tidak ada data user.</td>
+                          </tr>
+                        )}
+                        {!loading && !error && data.map((item, index) => (
+                          <tr
+                            key={item.id}
+                            className="bg-rose-300 even:bg-rose-200"
+                          >
+                            <td className="p-3">{index + 1}.</td>
 
-                        {/* FOTO */}
-                        <td className="p-3">
-                          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-white text-lg">
-                            👤
-                          </div>
-                        </td>
+                            {/* FOTO */}
+                            <td className="p-3">
+                              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-black text-lg">
+                                {/* Ganti emoji dengan teks/inisial atau avatar lain jika mau */}
+                                👤
+                              </div>
+                            </td>
 
-                        <td className="p-3">{item.name}</td>
-                        <td className="p-3">{item.email}</td>
+                            <td className="p-3">{item.name}</td>
+                            <td className="p-3">{item.email}</td>
 
-                        {/* AKSI */}
-                        <td className="p-3">
-                          <div className="flex justify-center gap-2">
-                            <button className="bg-green-500 p-1 rounded text-white">
-                              <Edit size={14} />
-                            </button>
-                            <button className="bg-red-600 p-1 rounded text-white">
-                              <Trash size={14} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
+                            {/* AKSI */}
+                            <td className="p-3">
+                              <div className="flex justify-center gap-2">
+                                <button className="bg-green-500 p-1 rounded text-white">
+                                  <Edit size={14} />
+                                </button>
+                                <button className="bg-red-600 p-1 rounded text-white">
+                                  <Trash size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
                 </table>
               </div>
 

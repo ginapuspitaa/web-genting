@@ -7,9 +7,10 @@ export default function Signup() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [message, setMessage] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
 
-    const handleSignup = (e) => {
+    const handleSignup = async (e) => {
         e.preventDefault();
 
         if (!name || !email || !password) {
@@ -22,11 +23,33 @@ export default function Signup() {
             return;
         }
 
-        setMessage("Akun berhasil dibuat");
+        try {
+            setIsLoading(true);
+            setMessage("");
 
-        setTimeout(() => {
-            navigate("/login");
-        }, 1000);
+            const response = await fetch("http://localhost:5000/api/signup", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, email, password }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                setMessage("Akun berhasil dibuat! Mengalihkan ke halaman login...");
+                
+                setTimeout(() => {
+                    navigate("/");
+                }, 1500);
+            } else {
+                setMessage(data.error || "Gagal membuat akun.");
+            }
+        } catch (err) {
+            console.error("Signup Error:", err);
+            setMessage("Terjadi kesalahan pada server. Coba lagi.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -125,11 +148,12 @@ export default function Signup() {
                     {/* BUTTON */}
                     <button
                         type="submit"
-                        className="w-full bg-indigo-600 hover:bg-indigo-700 
-                       text-white py-3 rounded-xl font-medium 
-                       transition duration-200 shadow-md hover:shadow-lg"
+                        disabled={isLoading}
+                        className={`w-full text-white py-3 rounded-xl font-medium transition duration-200 shadow-md hover:shadow-lg ${
+                            isLoading ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700"
+                        }`}
                     >
-                        Sign Up
+                        {isLoading ? "Signing up..." : "Sign Up"}
                     </button>
                 </form>
 

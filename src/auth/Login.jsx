@@ -8,7 +8,9 @@ export default function Login() {
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleLogin = async (e) => {
     e.preventDefault();
 
     if (!email || !password) {
@@ -16,14 +18,34 @@ export default function Login() {
       return;
     }
 
-    if (email === "admin@gmail.com" && password === "123456") {
-      setMessage("Login berhasil!");
+    try {
+      setIsLoading(true);
+      setMessage("");
 
-      setTimeout(() => {
-            navigate("/dashboard");
+      const response = await fetch("http://localhost:5000/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage("Login berhasil!");
+        // Optional: Save user data/token here (e.g., localStorage)
+        localStorage.setItem("user", JSON.stringify(data.user));
+        
+        setTimeout(() => {
+          navigate("/dashboard");
         }, 1000);
-    } else {
-      setMessage("Email atau Password salah!");
+      } else {
+        setMessage(data.error || "Email atau Password salah!");
+      }
+    } catch (err) {
+      console.error("Login Error:", err);
+      setMessage("Terjadi kesalahan pada server. Coba lagi.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -109,11 +131,12 @@ export default function Login() {
           {/* BUTTON */}
           <button
             type="submit"
-            className="w-full bg-indigo-600 hover:bg-indigo-700 
-                       text-white py-3 rounded-xl font-medium 
-                       transition duration-200 shadow-md hover:shadow-lg"
+            disabled={isLoading}
+            className={`w-full text-white py-3 rounded-xl font-medium transition duration-200 shadow-md hover:shadow-lg ${
+              isLoading ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700"
+            }`}
           >
-            Login
+            {isLoading ? "Logging in..." : "Login"}
           </button>
         </form>
 

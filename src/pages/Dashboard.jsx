@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import {
@@ -14,16 +14,28 @@ import {
 
 export default function Dashboard() {
   const [isOpen, setIsOpen] = useState(true);
+  const [stats, setStats] = useState({
+    users: 0,
+    categories: 0,
+    documents: 0,
+    chartData: []
+  });
 
-  const chartData = [
-    { kategori: "Kategori 1", jumlah: 5 },
-    { kategori: "Kategori 2", jumlah: 8 },
-    { kategori: "Kategori 3", jumlah: 3 },
-    { kategori: "Kategori 4", jumlah: 6 },
-  ];
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/api/dashboard/stats");
+        const data = await response.json();
+        setStats(data);
+      } catch (error) {
+        console.error("Failed to fetch dashboard stats", error);
+      }
+    };
+    fetchStats();
+  }, []);
 
   // Warna berbeda tiap bar
-  const colors = ["#f43f5e", "#fb7185", "#f97316", "#14b8a6"];
+  const colors = ["#f43f5e", "#fb7185", "#f97316", "#14b8a6", "#3b82f6", "#8b5cf6"];
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -35,9 +47,9 @@ export default function Dashboard() {
         <main className="p-6 space-y-6 overflow-y-auto">
           {/* STAT CARD */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <StatCard title="Dokumen" value="22" />
-            <StatCard title="Kategori" value="4" />
-            <StatCard title="User" value="2" />
+            <StatCard title="Dokumen" value={stats.documents || 0} />
+            <StatCard title="Kategori" value={stats.categories || 0} />
+            <StatCard title="User" value={stats.users || 0} />
           </div>
 
           {/* CHART */}
@@ -47,9 +59,9 @@ export default function Dashboard() {
             </h2>
 
             <ResponsiveContainer width="100%" height="90%">
-              <BarChart data={chartData}>
+              <BarChart data={stats.chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="kategori" />
+                <XAxis dataKey="name" />
                 <YAxis />
                 <Tooltip
                   contentStyle={{
@@ -57,9 +69,9 @@ export default function Dashboard() {
                     border: "none",
                   }}
                 />
-                <Bar dataKey="jumlah">
-                  {chartData.map((entry, index) => (
-                    <Cell key={index} fill={colors[index % colors.length]} />
+                <Bar dataKey="value">
+                  {stats.chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
                   ))}
                 </Bar>
               </BarChart>

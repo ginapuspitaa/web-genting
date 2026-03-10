@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { Plus, Edit, Trash } from "lucide-react";
@@ -6,18 +6,31 @@ import { Plus, Edit, Trash } from "lucide-react";
 export default function Category() {
   const [isOpen, setIsOpen] = useState(true);
 
-  const data = [
-    {
-      id: 1,
-      nama: "Kategori 1",
-      keterangan: "Keterangan 1",
-    },
-    {
-      id: 2,
-      nama: "Kategori 2",
-      keterangan: "Keterangan 2",
-    },
-  ];
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchCategories = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("http://localhost:5000/api/categories");
+      if (!response.ok) {
+        throw new Error("Gagal mengambil data dari server");
+      }
+      const jsonData = await response.json();
+      setData(jsonData);
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching categories:", err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -75,20 +88,35 @@ export default function Category() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.map((item, index) => (
+                    {loading && (
+                      <tr>
+                        <td colSpan="4" className="p-4 text-center">Loading data...</td>
+                      </tr>
+                    )}
+                    {error && (
+                      <tr>
+                        <td colSpan="4" className="p-4 text-center text-red-500">Error: {error}</td>
+                      </tr>
+                    )}
+                    {!loading && !error && data.length === 0 && (
+                      <tr>
+                        <td colSpan="4" className="p-4 text-center">Tidak ada data kategori.</td>
+                      </tr>
+                    )}
+                    {!loading && !error && data.map((item, index) => (
                       <tr
                         key={item.id}
                         className="bg-rose-300 even:bg-rose-200"
                       >
                         <td className="p-3">{index + 1}.</td>
-                        <td className="p-3">{item.nama}</td>
-                        <td className="p-3">{item.keterangan}</td>
+                        <td className="p-3">{item.name}</td>
+                        <td className="p-3">{item.description || '-'}</td>
                         <td className="p-3">
                           <div className="flex justify-center gap-2">
-                            <button className="bg-green-500 p-1 rounded text-white">
+                            <button className="bg-green-500 p-1 rounded text-white cursor-pointer">
                               <Edit size={14} />
                             </button>
-                            <button className="bg-red-600 p-1 rounded text-white">
+                            <button className="bg-red-600 p-1 rounded text-white cursor-pointer">
                               <Trash size={14} />
                             </button>
                           </div>
