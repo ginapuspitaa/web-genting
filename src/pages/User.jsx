@@ -5,6 +5,26 @@ import { Plus, Edit, Trash, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function User() {
+  const navigate = useNavigate();
+
+  // Role Protection
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem("user");
+      if (!storedUser) {
+        navigate("/");
+        return;
+      }
+      const parsed = JSON.parse(storedUser);
+      if (parsed.role !== "admin") {
+        navigate("/dashboard");
+      }
+    } catch (e) {
+      navigate("/");
+    }
+  }, [navigate]);
+
+  // Sidebar
   const [isOpen, setIsOpen] = useState(true);
 
   const [data, setData] = useState([]);
@@ -18,8 +38,7 @@ export default function User() {
   const [selectedUser, setSelectedUser] = useState(null);
 
   // Form state
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
-  const navigate = useNavigate();
+  const [form, setForm] = useState({ name: "", email: "", password: "", role: "petugas" });
 
   const fetchUsers = async () => {
     try {
@@ -50,7 +69,12 @@ export default function User() {
 
   const openEditModal = (user) => {
     setSelectedUser(user);
-    setForm({ name: user.name || "", email: user.email || "", password: "" });
+    setForm({
+      name: user.name || "",
+      email: user.email || "",
+      password: "", // Jangan tampilkan password lama
+      role: user.role || "petugas",
+    });
     setEditModalOpen(true);
   };
 
@@ -159,6 +183,7 @@ export default function User() {
                       <th className="p-3 text-center">Foto</th>
                       <th className="p-3">Nama</th>
                       <th className="p-3">Email</th>
+                      <th className="p-3 text-center">Role</th>
                       <th className="p-3 text-center w-32">Aksi</th>
                     </tr>
                   </thead>
@@ -175,16 +200,18 @@ export default function User() {
                     )}
                     {!loading && !error && data.filter(item => 
                         (item.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        (item.email || "").toLowerCase().includes(searchQuery.toLowerCase())
+                        (item.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        (item.role || "").toLowerCase().includes(searchQuery.toLowerCase())
                       ).length === 0 && (
                       <tr>
-                        <td colSpan="5" className="p-4 text-center text-gray-500">Tidak ada data yang cocok.</td>
+                        <td colSpan="6" className="p-4 text-center text-gray-500">Tidak ada data yang cocok.</td>
                       </tr>
                     )}
                     {!loading && !error && data
                       .filter(item => 
                         (item.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        (item.email || "").toLowerCase().includes(searchQuery.toLowerCase())
+                        (item.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        (item.role || "").toLowerCase().includes(searchQuery.toLowerCase())
                       )
                       .map((item, index) => (
                       <tr
@@ -203,6 +230,13 @@ export default function User() {
 
                         <td className="p-3">{item.name}</td>
                         <td className="p-3">{item.email}</td>
+                        <td className="p-3 text-center">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            item.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-orange-100 text-orange-700'
+                          }`}>
+                            {item.role === 'admin' ? 'Admin Utama' : 'Petugas Biasa'}
+                          </span>
+                        </td>
 
                         {/* AKSI */}
                         <td className="p-3">
@@ -280,6 +314,18 @@ export default function User() {
                     minLength={6}
                   />
                   <p className="text-xs text-gray-500 mt-1">Kosongkan jika tidak ingin mengubah password.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role Jabatan</label>
+                  <select
+                    name="role"
+                    value={form.role}
+                    onChange={handleInput}
+                    className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white"
+                  >
+                    <option value="petugas">Petugas Biasa</option>
+                    <option value="admin">Admin Utama</option>
+                  </select>
                 </div>
                 <div className="flex justify-end gap-3 pt-2">
                   <button

@@ -1,13 +1,31 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { Plus, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function AddUser() {
-  const [isOpen, setIsOpen] = useState(true);
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
   const navigate = useNavigate();
+
+  // Role Protection
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem("user");
+      if (!storedUser) {
+        navigate("/");
+        return;
+      }
+      const parsed = JSON.parse(storedUser);
+      if (parsed.role !== "admin") {
+        navigate("/dashboard");
+      }
+    } catch (e) {
+      navigate("/");
+    }
+  }, [navigate]);
+
+  const [isOpen, setIsOpen] = useState(true);
+  const [form, setForm] = useState({ name: "", email: "", password: "", role: "petugas" });
 
   const handleInput = (e) => {
     const { name, value } = e.target;
@@ -98,6 +116,19 @@ export default function AddUser() {
                       minLength={6}
                     />
                     <p className="text-xs text-gray-500 mt-1">Minimal 6 karakter.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tipe Akun (Role)</label>
+                    <select
+                      name="role"
+                      value={form.role}
+                      onChange={handleInput}
+                      className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white"
+                    >
+                      <option value="petugas">Petugas Biasa</option>
+                      <option value="admin">Admin Utama</option>
+                    </select>
                   </div>
 
                   {/* FORM ACTIONS */}

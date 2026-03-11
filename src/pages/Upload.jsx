@@ -8,6 +8,7 @@ export default function Upload() {
   const [isOpen, setIsOpen] = useState(true);
   const [categories, setCategories] = useState([]);
   const [users, setUsers] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
 
   const [file, setFile] = useState(null);
@@ -22,7 +23,24 @@ export default function Upload() {
 
   useEffect(() => {
     fetchCategories();
-    fetchUsers();
+
+    // Read logged-in user
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setCurrentUser(parsed);
+        if (parsed.role !== 'admin') {
+          // Non-admin: auto-fill petugas with own name
+          setForm(prev => ({ ...prev, petugas: parsed.name }));
+        } else {
+          // Admin: fetch user list for dropdown
+          fetchUsers();
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
   }, []);
 
   const fetchCategories = async () => {
@@ -142,17 +160,26 @@ export default function Upload() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Petugas Uploader</label>
-                  <select
-                    name="petugas"
-                    value={form.petugas}
-                    onChange={handleInput}
-                    className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-rose-500"
-                  >
-                    <option value="">-- Pilih Petugas --</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.name}>{u.name}</option>
-                    ))}
-                  </select>
+                  {currentUser && currentUser.role === 'admin' ? (
+                    <select
+                      name="petugas"
+                      value={form.petugas}
+                      onChange={handleInput}
+                      className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-rose-500"
+                    >
+                      <option value="">-- Pilih Petugas --</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.name}>{u.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={form.petugas}
+                      readOnly
+                      className="w-full border border-gray-300 px-3 py-2 rounded bg-gray-100 text-gray-700 cursor-not-allowed"
+                    />
+                  )}
                 </div>
 
                 <div>

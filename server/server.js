@@ -68,14 +68,16 @@ app.get('/api/users', async (req, res) => {
 
 app.post('/api/users', async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
     if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, and password are required' });
     if (password.length < 6) return res.status(400).json({ error: 'Password minimal 6 karakter!' });
 
     const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
     if (existing.length > 0) return res.status(400).json({ error: 'Email sudah terdaftar' });
 
-    const [result] = await pool.query('INSERT INTO users (name, email, password) VALUES (?, ?, ?)', [name, email, password]);
+    const userRole = role === 'admin' ? 'admin' : 'petugas';
+
+    const [result] = await pool.query('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)', [name, email, password, userRole]);
     const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
     res.status(201).json(rows[0]);
   } catch (error) {
@@ -87,17 +89,19 @@ app.post('/api/users', async (req, res) => {
 app.put('/api/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
     if (!name || !email) return res.status(400).json({ error: 'Name and email are required' });
     
     const [existing] = await pool.query('SELECT id FROM users WHERE email = ? AND id != ?', [email, id]);
     if (existing.length > 0) return res.status(400).json({ error: 'Email sudah terdaftar untuk user lain' });
 
+    const userRole = role === 'admin' ? 'admin' : 'petugas';
+
     if (password) {
       if (password.length < 6) return res.status(400).json({ error: 'Password minimal 6 karakter!' });
-      await pool.query('UPDATE users SET name = ?, email = ?, password = ? WHERE id = ?', [name, email, password, id]);
+      await pool.query('UPDATE users SET name = ?, email = ?, password = ?, role = ? WHERE id = ?', [name, email, password, userRole, id]);
     } else {
-      await pool.query('UPDATE users SET name = ?, email = ? WHERE id = ?', [name, email, id]);
+      await pool.query('UPDATE users SET name = ?, email = ?, role = ? WHERE id = ?', [name, email, userRole, id]);
     }
     
     const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);

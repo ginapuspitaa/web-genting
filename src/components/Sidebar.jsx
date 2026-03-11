@@ -6,10 +6,24 @@ import {
   LogOut,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
 
 export default function Sidebar({ isOpen }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.role === 'admin') setIsAdmin(true);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
 
   return (
     <aside
@@ -49,13 +63,15 @@ export default function Sidebar({ isOpen }) {
             onClick={() => navigate("/category")}
           />
 
-          <SidebarItem
-            icon={<Users size={18} />}
-            text="User"
-            isOpen={isOpen}
-            active={location.pathname === "/user"}
-            onClick={() => navigate("/user")}
-          />
+          {isAdmin && (
+            <SidebarItem
+              icon={<Users size={18} />}
+              text="User"
+              isOpen={isOpen}
+              active={location.pathname === "/user"}
+              onClick={() => navigate("/user")}
+            />
+          )}
         </nav>
       </div>
 
