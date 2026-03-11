@@ -13,9 +13,8 @@ export default function Sidebar({ isOpen }) {
 
   return (
     <aside
-      className={`${
-        isOpen ? "w-64" : "w-20"
-      } bg-rose-400 text-white flex flex-col justify-between transition-all duration-300`}
+      className={`${isOpen ? "w-64" : "w-20"
+        } bg-rose-400 text-white flex flex-col justify-between transition-all duration-300`}
     >
       <div>
         {/* LOGO */}
@@ -83,10 +82,9 @@ function SidebarItem({ icon, text, isOpen, active, onClick }) {
     <div
       onClick={onClick}
       className={`flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer transition
-        ${
-          active
-            ? "bg-white text-rose-400 font-semibold shadow"
-            : "hover:bg-rose-500 text-white"
+        ${active
+          ? "bg-white text-rose-400 font-semibold shadow"
+          : "hover:bg-rose-500 text-white"
         }`}
     >
       {icon}

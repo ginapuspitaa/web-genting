@@ -4,6 +4,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs/promises';
+import archiver from 'archiver';
 
 // Load environment variables
 dotenv.config();
@@ -64,6 +66,61 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
+app.post('/api/users', async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, and password are required' });
+    if (password.length < 6) return res.status(400).json({ error: 'Password minimal 6 karakter!' });
+
+    const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
+    if (existing.length > 0) return res.status(400).json({ error: 'Email sudah terdaftar' });
+
+    const [result] = await pool.query('INSERT INTO users (name, email, password) VALUES (?, ?, ?)', [name, email, password]);
+    const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
+    res.status(201).json(rows[0]);
+  } catch (error) {
+    console.error('Error creating user:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.put('/api/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email, password } = req.body;
+    if (!name || !email) return res.status(400).json({ error: 'Name and email are required' });
+    
+    const [existing] = await pool.query('SELECT id FROM users WHERE email = ? AND id != ?', [email, id]);
+    if (existing.length > 0) return res.status(400).json({ error: 'Email sudah terdaftar untuk user lain' });
+
+    if (password) {
+      if (password.length < 6) return res.status(400).json({ error: 'Password minimal 6 karakter!' });
+      await pool.query('UPDATE users SET name = ?, email = ?, password = ? WHERE id = ?', [name, email, password, id]);
+    } else {
+      await pool.query('UPDATE users SET name = ?, email = ? WHERE id = ?', [name, email, id]);
+    }
+    
+    const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.delete('/api/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [result] = await pool.query('DELETE FROM users WHERE id = ?', [id]);
+    if (result.affectedRows === 0) return res.status(404).json({ error: 'User not found' });
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Categories endpoints
 app.get('/api/categories', async (req, res) => {
   try {
@@ -84,6 +141,37 @@ app.post('/api/categories', async (req, res) => {
     res.status(201).json(rows[0]);
   } catch (error) {
     console.error('Error creating category:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.put('/api/categories/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description } = req.body;
+    if (!name) return res.status(400).json({ error: 'name is required' });
+    await pool.query('UPDATE categories SET name = ?, description = ? WHERE id = ?', [name, description || null, id]);
+    const [rows] = await pool.query('SELECT * FROM categories WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Category not found' });
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error updating category:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.delete('/api/categories/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [docs] = await pool.query('SELECT id FROM documents WHERE category_id = ? LIMIT 1', [id]);
+    if (docs.length > 0) {
+      return res.status(400).json({ error: 'Kategori tidak dapat dihapus karena masih digunakan oleh dokumen.' });
+    }
+    const [result] = await pool.query('DELETE FROM categories WHERE id = ?', [id]);
+    if (result.affectedRows === 0) return res.status(404).json({ error: 'Category not found' });
+    res.json({ message: 'Category deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting category:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -128,6 +216,174 @@ app.post('/api/documents', upload.single('file'), async (req, res) => {
     res.status(201).json(rows[0]);
   } catch (error) {
     console.error('Error creating document:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Download document
+app.get('/api/documents/:id/download', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [docs] = await pool.query('SELECT file_path, name FROM documents WHERE id = ?', [id]);
+    if (docs.length === 0 || !docs[0].file_path) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    
+    const localFilePath = docs[0].file_path.startsWith('/') ? docs[0].file_path.substring(1) : docs[0].file_path;
+    const absPath = path.resolve(localFilePath);
+    
+    // We use path.basename to extract the filename with extension
+    res.download(absPath, path.basename(localFilePath));
+  } catch (error) {
+    console.error('Error downloading document:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Download all documents as ZIP
+app.get('/api/documents/download-all', async (req, res) => {
+  try {
+    const [docs] = await pool.query('SELECT file_path, name FROM documents WHERE file_path IS NOT NULL');
+    
+    if (docs.length === 0) {
+      return res.status(404).json({ error: 'Tidak ada file untuk didownload' });
+    }
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', 'attachment; filename="Semua_Dokumen.zip"');
+
+    const archive = archiver('zip', {
+      zlib: { level: 9 } // Sets the compression level.
+    });
+
+    archive.on('error', function(err) {
+      throw err;
+    });
+
+    archive.pipe(res);
+
+    // Keep track of names to prevent duplicates
+    const nameCount = {};
+
+    for (const doc of docs) {
+      const localFilePath = doc.file_path.startsWith('/') ? doc.file_path.substring(1) : doc.file_path;
+      const absPath = path.resolve(localFilePath);
+      
+      try {
+        await fs.access(absPath); // check if file exists
+        const ext = path.extname(localFilePath);
+        
+        // Handle duplicate names
+        let safeName = doc.name;
+        if (nameCount[safeName]) {
+          nameCount[safeName]++;
+          safeName = `${safeName}_${nameCount[safeName]}`;
+        } else {
+          nameCount[safeName] = 1;
+        }
+
+        archive.file(absPath, { name: `${safeName}${ext}` });
+      } catch (err) {
+        console.error(`File missing during zip: ${absPath}`);
+      }
+    }
+
+    await archive.finalize();
+
+  } catch (error) {
+    console.error('Error creating zip:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+});
+
+// Update document
+app.put('/api/documents/:id', upload.single('file'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, category_id, petugas, upload_date } = req.body;
+    
+    const [existing] = await pool.query('SELECT file_path FROM documents WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    let filePath = existing[0].file_path;
+
+    if (req.file) {
+      filePath = '/uploads/' + req.file.filename;
+      
+      if (existing[0].file_path) {
+        try {
+          const oldLocalReqPath = existing[0].file_path.startsWith('/') ? existing[0].file_path.substring(1) : existing[0].file_path;
+          await fs.unlink(path.resolve(oldLocalReqPath));
+        } catch (err) {
+          console.error('Failed to delete old file:', err);
+        }
+      }
+    }
+
+    await pool.query(
+      'UPDATE documents SET name=?, description=?, category_id=?, petugas=?, upload_date=?, file_path=? WHERE id=?',
+      [name, description || null, category_id || null, petugas || null, upload_date || null, filePath, id]
+    );
+
+    const [rows] = await pool.query('SELECT d.*, c.name as category_name FROM documents d LEFT JOIN categories c ON d.category_id = c.id WHERE d.id = ?', [id]);
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error updating document:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete all documents
+app.delete('/api/documents/all', async (req, res) => {
+  try {
+    const [existing] = await pool.query('SELECT file_path FROM documents WHERE file_path IS NOT NULL');
+    
+    // Delete physical files
+    for (const doc of existing) {
+      try {
+        const localReqPath = doc.file_path.startsWith('/') ? doc.file_path.substring(1) : doc.file_path;
+        await fs.unlink(path.resolve(localReqPath));
+      } catch (err) {
+        console.error('Failed to delete file during bulk delete:', err);
+      }
+    }
+
+    // Delete db records
+    await pool.query('DELETE FROM documents');
+    res.json({ message: 'All documents deleted successfully' });
+  } catch (error) {
+    console.error('Error bulk deleting documents:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete document
+app.delete('/api/documents/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const [existing] = await pool.query('SELECT file_path FROM documents WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    if (existing[0].file_path) {
+      try {
+        const oldLocalReqPath = existing[0].file_path.startsWith('/') ? existing[0].file_path.substring(1) : existing[0].file_path;
+        await fs.unlink(path.resolve(oldLocalReqPath));
+      } catch (err) {
+        console.error('Failed to delete file:', err);
+      }
+    }
+
+    await pool.query('DELETE FROM documents WHERE id = ?', [id]);
+    res.json({ message: 'Document deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting document:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
