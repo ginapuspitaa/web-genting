@@ -6,6 +6,11 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  
+  // Forgot password states
+  const [isForgotMode, setIsForgotMode] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+
   const navigate = useNavigate();
 
   const [isLoading, setIsLoading] = useState(false);
@@ -49,6 +54,45 @@ export default function Login() {
     }
   };
 
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+
+    if (!email || !newPassword) {
+      setMessage("Email dan Password Baru wajib diisi!");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setMessage("");
+
+      const response = await fetch("http://localhost:5000/api/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, newPassword }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage("Berhasil! " + data.message);
+        setTimeout(() => {
+          setIsForgotMode(false);
+          setPassword("");
+          setNewPassword("");
+          setMessage(""); // clear success message before switching to login mode
+        }, 2500);
+      } else {
+        setMessage(data.error || "Gagal mereset password!");
+      }
+    } catch (err) {
+      console.error("Reset Password Error:", err);
+      setMessage("Terjadi kesalahan pada server. Coba lagi.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 px-4">
 
@@ -57,15 +101,17 @@ export default function Login() {
         {/* Header */}
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold text-gray-800 mb-2">
-            Welcome Back
+            {isForgotMode ? "Reset Password" : "Welcome Back"}
           </h2>
           <p className="text-gray-500 text-sm">
-            Please login to your account
+            {isForgotMode 
+              ? "Masukkan email akun Anda dan password baru" 
+              : "Please login to your account"}
           </p>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={isForgotMode ? handleForgotPassword : handleLogin} className="space-y-6">
 
           {/* EMAIL */}
           <div>
@@ -92,36 +138,68 @@ export default function Login() {
           </div>
 
           {/* PASSWORD */}
-          {/* PASSWORD */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Password
-            </label>
+          {!isForgotMode ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Password
+              </label>
 
-            <div className="relative">
-              <Lock
-                size={18}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-              />
+              <div className="relative">
+                <Lock
+                  size={18}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                />
 
-              <input
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 
-                 focus:outline-none focus:ring-2 focus:ring-indigo-500 
-                 focus:border-transparent transition duration-200"
-              />
+                <input
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 
+                   focus:outline-none focus:ring-2 focus:ring-indigo-500 
+                   focus:border-transparent transition duration-200"
+                />
+              </div>
+
+              {/* Forgot Password Link */}
+              <div className="flex justify-end mt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsForgotMode(true);
+                    setMessage("");
+                  }}
+                  className="text-xs text-indigo-600 hover:underline cursor-pointer bg-transparent border-none p-0"
+                >
+                  Forgot password?
+                </button>
+              </div>
             </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                New Password
+              </label>
 
-            {/* Forgot Password di bawah input */}
-            <div className="flex justify-end mt-2">
-              <span className="text-xs text-indigo-600 hover:underline cursor-pointer">
-                Forgot password?
-              </span>
+              <div className="relative">
+                <Lock
+                  size={18}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                />
+
+                <input
+                  type="password"
+                  placeholder="Enter new password (min. 6 chars)"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 
+                   focus:outline-none focus:ring-2 focus:ring-indigo-500 
+                   focus:border-transparent transition duration-200"
+                  minLength={6}
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* MESSAGE */}
           {message && (
@@ -136,8 +214,23 @@ export default function Login() {
               isLoading ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700"
             }`}
           >
-            {isLoading ? "Logging in..." : "Login"}
+            {isLoading ? "Memproses..." : (isForgotMode ? "Reset Password" : "Login")}
           </button>
+          
+          {/* CANCEL BUTTON FOR FORGOT MODE */}
+          {isForgotMode && (
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => {
+                setIsForgotMode(false);
+                setMessage("");
+              }}
+              className="w-full text-gray-600 bg-gray-100 hover:bg-gray-200 py-3 rounded-xl font-medium transition duration-200 cursor-pointer"
+            >
+              Kembali ke Login
+            </button>
+          )}
         </form>
 
         {/* FOOTER */}

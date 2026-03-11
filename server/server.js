@@ -448,6 +448,38 @@ app.post('/api/signup', async (req, res) => {
   }
 });
 
+// Forgot Password endpoint
+app.post('/api/forgot-password', async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+    
+    if (!email || !newPassword) {
+      return res.status(400).json({ error: 'Email dan password baru wajib diisi!' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Password baru minimal 6 karakter!' });
+    }
+
+    // Check if email exists
+    const [existingUsers] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
+    if (existingUsers.length === 0) {
+      return res.status(404).json({ error: 'Email tidak ditemukan di sistem!' });
+    }
+
+    // Update password
+    await pool.query(
+      'UPDATE users SET password = ? WHERE email = ?',
+      [newPassword, email]
+    );
+
+    res.json({ message: 'Password berhasil direset. Silakan login dengan password baru.' });
+  } catch (error) {
+    console.error('Error during password reset:', error);
+    res.status(500).json({ error: 'Terjadi kesalahan pada server' });
+  }
+});
+
 // Dashboard Statistics endpoint
 app.get('/api/dashboard/stats', async (req, res) => {
   try {
